@@ -1,0 +1,18 @@
+html {
+    background-color:aliceblue;
+    font-family: 'comic sans ms';
+    font-size: 13pt;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    min-height: 98vh;
+}
+
+main {
+    background-color: antiquewhite;
+    width:  70rem;
+    padding:  3rem;
+    border-radius: 2rem;
+}
