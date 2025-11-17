@@ -1,3 +1,33 @@
+import { DatabaseSync } from "node:sqlite";
+
+const db_path = "./db.sqlite";
+const db = new DatabaseSync(db_path);
+
+db.exec(
+  `CREATE TABLE IF NOT EXISTS fc_categories (
+    category_id   INTEGER PRIMARY KEY,
+    id            TEXT UNIQUE NOT NULL,
+    name          TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS fc_cards (
+    id            INTEGER PRIMARY KEY,
+    category_id   INTEGER NOT NULL REFERENCES fc_categories(category_id) ON DELETE NO ACTION,
+    front         TEXT NOT NULL,
+    back          TEXT NOT NULL
+  ) STRICT;`
+);
+
+const db_ops = {
+  insert_category: db.prepare(
+    `INSERT INTO fc_categories (id, name)
+        VALUES (?, ?) RETURNING category_id, id, name;`
+  ),
+  insert_card: db.prepare(
+    `INSERT INTO fc_cards (category_id, front, back) 
+        VALUES (?, ?, ?) RETURNING id, front, back;`
+  ),
+};
+
 const card_categories = {
   "j-angielski-food": {
     name: "j. angielski - food",
@@ -20,6 +50,23 @@ const card_categories = {
     ],
   },
 };
+
+if (process.env.POPULATE_DB) {
+  console.log("Populating db...");
+  Object.entries(card_categories).map(([id, data]) => {
+    let category = db_ops.insert_category.get(id, data.name);
+    console.log("Created category:", category);
+    for (let card of data.cards) {
+      let c = db_ops.insert_card.get(
+        category.category_id,
+        card.front,
+        card.back
+      );
+      console.log("Created card:", c);
+    }
+  });
+}
+
 
 export function getCategorySummaries() {
   return Object.entries(card_categories).map(([id, category]) => {
