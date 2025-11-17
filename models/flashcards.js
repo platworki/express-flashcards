@@ -26,66 +26,44 @@ const db_ops = {
     `INSERT INTO fc_cards (category_id, front, back) 
         VALUES (?, ?, ?) RETURNING id, front, back;`
   ),
+  insert_card_by_id: db.prepare(
+    `INSERT INTO fc_cards (category_id, front, back) VALUES (
+      (SELECT category_id FROM fc_categories WHERE id = ?),
+      ?, 
+      ?
+    ) 
+    RETURNING id, front, back;`
+  ),
+  get_categories: db.prepare("SELECT id, name FROM fc_categories;"),
+  get_category_by_id: db.prepare(
+    "SELECT category_id, id, name FROM fc_categories WHERE id = ?;"
+  ),
+  get_cards_by_category_id: db.prepare(
+    "SELECT id, front, back FROM fc_cards WHERE category_id = ?;"
+  ),
 };
-
-const card_categories = {
-  "j-angielski-food": {
-    name: "j. angielski - food",
-    cards: [
-      { front: "truskawka", back: "strawberry" },
-      { front: "gałka muszkatołowa", back: "nutmeg" },
-      { front: "jabłko", back: "apple" },
-      { front: "karczoch", back: "artichoke" },
-      { front: "cielęcina", back: "veal" },
-    ],
-  },
-  "stolice-europejskie": {
-    name: "stolice europejskie",
-    cards: [
-      { front: "Holandia", back: "Amsterdam" },
-      { front: "Włochy", back: "Rzym" },
-      { front: "Niemcy", back: "Berlin" },
-      { front: "Węgry", back: "Budapeszt" },
-      { front: "Rumunia", back: "Bukareszt" },
-    ],
-  },
-};
-
-if (process.env.POPULATE_DB) {
-  console.log("Populating db...");
-  Object.entries(card_categories).map(([id, data]) => {
-    let category = db_ops.insert_category.get(id, data.name);
-    console.log("Created category:", category);
-    for (let card of data.cards) {
-      let c = db_ops.insert_card.get(
-        category.category_id,
-        card.front,
-        card.back
-      );
-      console.log("Created card:", c);
-    }
-  });
-}
-
 
 export function getCategorySummaries() {
-  return Object.entries(card_categories).map(([id, category]) => {
-    return { id, name: category.name };
-  });
+  var categories = db_ops.get_categories.all();
+  return categories;
 }
 
 export function hasCategory(categoryId) {
-  return card_categories.hasOwnProperty(categoryId);
+  let category = db_ops.get_category_by_id.get(categoryId);
+  return category != null;
 }
 
 export function getCategory(categoryId) {
-  if (hasCategory(categoryId))
-    return { id: categoryId, ...card_categories[categoryId] };
+  let category = db_ops.get_category_by_id.get(categoryId);
+  if (category != null) {
+    category.cards = db_ops.get_cards_by_category_id.all(category.category_id);
+    return category;
+  }
   return null;
 }
 
 export function addCard(categoryId, card) {
-  if (hasCategory(categoryId)) card_categories[categoryId].cards.push(card);
+  return db_ops.insert_card_by_id.get(categoryId, card.front, card.back);
 }
 
 export function validateCardData(card) {
@@ -105,10 +83,15 @@ export function validateCardData(card) {
   return errors;
 }
 
+export function addCategory(categoryId, name) {
+  return db_ops.insert_category.get(categoryId, name);
+}
+
 export default {
   getCategorySummaries,
   hasCategory,
   getCategory,
   addCard,
+  addCategory,
   validateCardData,
 };
